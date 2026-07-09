@@ -11,10 +11,15 @@ logger = logging.getLogger(__name__)
 
 
 async def _setup_bot_profile(bot) -> None:
-    await bot.set_my_commands([
-        BotCommand(command="start", description="Открыть магазин"),
-        BotCommand(command="admin", description="Админ-панель"),
-    ])
+    """Настройка команд и кнопки меню. Все операции необязательны для работы
+    бота — при разовом сетевом сбое (блокировки IP Telegram) просто логируем."""
+    try:
+        await bot.set_my_commands([
+            BotCommand(command="start", description="Открыть магазин"),
+            BotCommand(command="admin", description="Админ-панель"),
+        ])
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Не удалось установить команды бота: %s", e)
     try:
         await bot.set_chat_menu_button(
             menu_button=MenuButtonWebApp(text="Каталог", web_app=WebAppInfo(url=settings.webapp_url))
@@ -33,6 +38,10 @@ async def run_bot() -> None:
     dp.include_router(get_router())
 
     await _setup_bot_profile(bot)
-    await bot.delete_webhook(drop_pending_updates=True)
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("delete_webhook не выполнен: %s", e)
     logger.info("Бот запущен, начинаю polling...")
+    # start_polling сам переживает сетевые обрывы и повторяет запросы
     await dp.start_polling(bot)

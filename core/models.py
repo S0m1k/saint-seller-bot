@@ -74,6 +74,7 @@ class Product(Base):
     condition: Mapped[str | None] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text)
     price: Mapped[float | None] = mapped_column(Numeric(12, 2))
+    stock: Mapped[int] = mapped_column(Integer, default=1)  # остаток на складе
     category_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL")
     )

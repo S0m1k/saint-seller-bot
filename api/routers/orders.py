@@ -143,5 +143,7 @@ async def create_order(
     )
     order = result.scalar_one()
 
-    await _notify_admins(order, user)
+    # Уведомление админам временно отключено: заказ оформляется через менеджера,
+    # клиент пишет напрямую @MANAGER_USERNAME. Чтобы вернуть — раскомментировать:
+    # await _notify_admins(order, user)
     return _serialize_order(order)

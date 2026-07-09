@@ -22,6 +22,7 @@ class ProductOut(BaseModel):
     description: str | None = None
     price: float | None = None
     category_id: int | None = None
+    stock: int = 0
     photos: list[str] = []
     is_favorite: bool = False
     in_cart: bool = False

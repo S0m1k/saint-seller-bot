@@ -1,11 +1,11 @@
 from aiogram import Router
-from aiogram.filters import CommandStart
-from aiogram.types import Message
+from aiogram.filters import Command, CommandStart
+from aiogram.types import Message, ReplyKeyboardRemove
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from core.database import async_session
 from core.models import User
-from bot.keyboards.common import shop_reply_keyboard
+from bot.keyboards.common import shop_inline_keyboard, shop_reply_keyboard
 
 router = Router()
 
@@ -46,4 +46,22 @@ async def upsert_user(message: Message) -> None:
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     await upsert_user(message)
-    await message.answer(WELCOME, reply_markup=shop_reply_keyboard())
+    inline = shop_inline_keyboard()
+    if inline is not None:
+        # Inline-кнопка отдаёт initData корректно (в отличие от reply-клавиатуры).
+        # Заодно убираем возможную устаревшую reply-клавиатуру.
+        await message.answer(WELCOME, reply_markup=ReplyKeyboardRemove())
+        await message.answer("Каталог открывается кнопкой ниже 👇", reply_markup=inline)
+    else:
+        # dev/http: web_app-кнопки недоступны, показываем обычную клавиатуру
+        await message.answer(WELCOME, reply_markup=shop_reply_keyboard())
+
+
+@router.message(Command("myid"))
+async def cmd_myid(message: Message) -> None:
+    await upsert_user(message)
+    u = message.from_user
+    await message.answer(
+        f"🆔 Ваш Telegram ID: <code>{u.id}</code>\n"
+        f"Username: {'@' + u.username if u.username else '—'}"
+    )

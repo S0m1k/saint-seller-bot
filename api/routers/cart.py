@@ -54,6 +54,10 @@ async def add_to_cart(
     if not product or not product.is_active:
         raise HTTPException(status_code=404, detail="Товар не найден")
 
+    stock = product.stock if product.stock is not None else 0
+    if stock <= 0:
+        raise HTTPException(status_code=400, detail="Товара нет в наличии")
+
     result = await session.execute(
         select(CartItem).where(
             CartItem.user_id == user.telegram_id, CartItem.product_id == product_id
@@ -61,7 +65,9 @@ async def add_to_cart(
     )
     item = result.scalar_one_or_none()
     if item:
-        item.quantity += 1
+        if item.quantity >= stock:
+            raise HTTPException(status_code=400, detail=f"Доступно только {stock} шт.")
+        item.quantity = min(item.quantity + 1, stock)
     else:
         session.add(CartItem(user_id=user.telegram_id, product_id=product_id, quantity=1))
     await session.commit()
@@ -85,7 +91,9 @@ async def set_quantity(
         if quantity <= 0:
             await session.delete(item)
         else:
-            item.quantity = quantity
+            product = await session.get(Product, product_id)
+            stock = (product.stock if product and product.stock is not None else quantity)
+            item.quantity = min(quantity, max(stock, 1))
         await session.commit()
     return await _build_cart(session, user.telegram_id)
 

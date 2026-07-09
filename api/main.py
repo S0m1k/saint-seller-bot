@@ -35,6 +35,12 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/api/config")
+async def public_config():
+    """Публичная конфигурация для веб-приложения."""
+    return {"manager_username": settings.manager_username}
+
+
 # Медиа (фото товаров) и статика веб-приложения
 Path(settings.media_dir).mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory=str(settings.media_dir)), name="media")

@@ -176,12 +176,43 @@ async def st_price(message: Message, state: FSMContext) -> None:
                              reply_markup=kb.skip_or_cancel("adm:skip:price"))
         return
     await state.update_data(price=price)
-    await _ask_description(message, state)
+    await _ask_stock(message, state)
 
 
 @router.callback_query(AddProduct.price, F.data == "adm:skip:price")
 async def st_price_skip(call: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(price=None)
+    await _ask_stock(call.message, state)
+    await call.answer()
+
+
+async def _ask_stock(message: Message, state: FSMContext) -> None:
+    await state.set_state(AddProduct.stock)
+    await message.answer(
+        "🔢 Введите <b>количество</b> (остаток на складе, только число).\n"
+        "Пропустите — будет 1 шт.",
+        reply_markup=kb.skip_or_cancel("adm:skip:stock"),
+    )
+
+
+@router.message(AddProduct.stock, F.text)
+async def st_stock(message: Message, state: FSMContext) -> None:
+    raw = message.text.strip().replace(" ", "")
+    try:
+        stock = int(raw)
+        if stock < 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("Введите целое число ≥ 0, например 1 или 5.",
+                             reply_markup=kb.skip_or_cancel("adm:skip:stock"))
+        return
+    await state.update_data(stock=stock)
+    await _ask_description(message, state)
+
+
+@router.callback_query(AddProduct.stock, F.data == "adm:skip:stock")
+async def st_stock_skip(call: CallbackQuery, state: FSMContext) -> None:
+    await state.update_data(stock=1)
     await _ask_description(call.message, state)
     await call.answer()
 
@@ -249,6 +280,7 @@ async def cb_photos_done(call: CallbackQuery, state: FSMContext, bot: Bot) -> No
             size=data.get("size"),
             condition=data.get("condition"),
             price=data.get("price"),
+            stock=data.get("stock", 1),
             description=data.get("description"),
             category_id=data["category_id"],
             is_active=True,
@@ -369,6 +401,7 @@ def _product_card(product: Product) -> str:
         lines.append(f"Состояние: {product.condition}")
     if product.price is not None:
         lines.append(f"Цена: {product.price:g} ₽")
+    lines.append(f"В наличии: {product.stock} шт.")
     if product.description:
         lines.append(f"\n{product.description}")
     lines.append(f"\nСтатус: {'🟢 активен' if product.is_active else '🔴 скрыт'}")

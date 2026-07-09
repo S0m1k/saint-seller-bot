@@ -22,6 +22,7 @@ def serialize_product(
         description=product.description,
         price=float(product.price) if product.price is not None else None,
         category_id=product.category_id,
+        stock=product.stock if product.stock is not None else 0,
         photos=[photo_url(p.file_path) for p in product.photos],
         is_favorite=product.id in favorite_ids,
         in_cart=product.id in cart_ids,

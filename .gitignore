@@ -18,6 +18,9 @@ env/
 media/*
 !media/.gitkeep
 
+# Logs
+*.log
+
 # IDE / OS
 .idea/
 .vscode/

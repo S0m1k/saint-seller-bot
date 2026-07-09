@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     # Telegram
     bot_token: str = ""
     admin_ids: str = ""  # список id через запятую
+    manager_username: str = ""  # username менеджера (без @) для оформления заказа
 
     # Web App
     webapp_url: str = "http://localhost:8000"

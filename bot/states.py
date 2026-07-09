@@ -8,6 +8,7 @@ class AddProduct(StatesGroup):
     size = State()
     condition = State()
     price = State()
+    stock = State()
     description = State()
     photos = State()
 
