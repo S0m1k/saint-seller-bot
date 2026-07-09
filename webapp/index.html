@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+  <title>Saint Seller</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">SS</span>
+      <span class="brand-name">Saint&nbsp;Seller</span>
+    </div>
+    <button id="account-btn" class="icon-btn" aria-label="Профиль">👤</button>
+  </header>
+
+  <div class="search-row" id="search-row">
+    <input id="search-input" type="search" inputmode="search" placeholder="Поиск: название или бренд" autocomplete="off" />
+    <button id="brand-btn" class="chip chip-filter" aria-label="Фильтр по бренду">Бренд ▾</button>
+  </div>
+
+  <nav class="chips" id="category-chips"></nav>
+
+  <main id="view" class="view"></main>
+
+  <nav class="tabbar">
+    <button class="tab active" data-tab="catalog"><span>🛍</span><small>Каталог</small></button>
+    <button class="tab" data-tab="favorites"><span>❤️</span><small>Избранное</small></button>
+    <button class="tab" data-tab="cart"><span>🛒</span><small>Корзина</small><b id="cart-badge" class="badge hidden">0</b></button>
+    <button class="tab" data-tab="orders"><span>🧾</span><small>Заказы</small></button>
+  </nav>
+
+  <!-- Модалка товара -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card" id="modal-card"></div>
+  </div>
+
+  <!-- Нижний лист (фильтр бренда / оформление заказа) -->
+  <div id="sheet" class="sheet hidden">
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-card" id="sheet-card"></div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
