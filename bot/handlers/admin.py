@@ -1,4 +1,6 @@
+import asyncio
 import logging
+from collections import defaultdict
 
 from aiogram import Bot, F, Router
 from aiogram.filters import BaseFilter, Command
@@ -28,6 +30,11 @@ router = Router()
 
 PRODUCTS_PER_PAGE = 8
 MENU_TEXT = "🛠 <b>Админ-панель Saint Seller</b>\n\nВыберите действие:"
+
+# Фото альбомом прилетают отдельными апдейтами почти одновременно и обрабатываются
+# как параллельные задачи aiogram — без блокировки чтение-изменение-запись состояния
+# FSM гонится и теряет/дублирует фото. Лочим по пользователю, чтобы append был атомарным.
+_photo_locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
 
 
 class IsAdmin(BaseFilter):
@@ -249,11 +256,14 @@ async def _ask_photos(message: Message, state: FSMContext) -> None:
 
 @router.message(AddProduct.photos, F.photo)
 async def st_photo(message: Message, state: FSMContext) -> None:
-    data = await state.get_data()
-    photos: list[str] = data.get("photos", [])
-    photos.append(message.photo[-1].file_id)  # самое большое разрешение
-    await state.update_data(photos=photos)
-    await message.answer(f"Добавлено фото ({len(photos)}). Ещё или «Готово».",
+    lock = _photo_locks[message.from_user.id]
+    async with lock:
+        data = await state.get_data()
+        photos: list[dict] = data.get("photos", [])
+        photos.append({"message_id": message.message_id, "file_id": message.photo[-1].file_id})
+        await state.update_data(photos=photos)
+        count = len(photos)
+    await message.answer(f"Добавлено фото ({count}). Ещё или «Готово».",
                          reply_markup=kb.photos_done())
 
 
@@ -266,10 +276,13 @@ async def st_photo_wrong(message: Message) -> None:
 @router.callback_query(AddProduct.photos, F.data == "adm:photos_done")
 async def cb_photos_done(call: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     data = await state.get_data()
-    photos: list[str] = data.get("photos", [])
-    if not photos:
+    photos_data: list[dict] = data.get("photos", [])
+    if not photos_data:
         await call.answer("Добавьте хотя бы одно фото", show_alert=True)
         return
+    # Сортируем по message_id — гарантирует порядок отправки независимо от
+    # того, в каком порядке фактически обработались параллельные апдейты.
+    photos = [p["file_id"] for p in sorted(photos_data, key=lambda p: p["message_id"])]
 
     await call.message.edit_text("⏳ Сохраняю товар...")
 
