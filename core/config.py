@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     # Медиа
     media_dir: Path = BASE_DIR / "media"
 
+    # Статистика / расписание
+    timezone: str = "Europe/Moscow"
+    daily_stats_hour: int = 21  # час (по локальному TZ) отправки дневной статистики
+
     # Разработка
     debug: bool = False
     dev_user_id: int | None = None

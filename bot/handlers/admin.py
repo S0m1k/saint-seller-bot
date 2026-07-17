@@ -5,7 +5,7 @@ from collections import defaultdict
 from aiogram import Bot, F, Router
 from aiogram.filters import BaseFilter, Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
@@ -20,10 +20,18 @@ from core.models import (
     ProductPhoto,
     User,
 )
+from bot.broadcast import broadcast
 from bot.keyboards import admin as kb
 from bot.media import save_product_photo
 from bot.notifications import broadcast_new_product
-from bot.states import AddCategory, AddProduct
+from bot.stats import (
+    collect_stats,
+    fetch_users,
+    format_stats,
+    local_day_bounds_utc,
+    users_to_xlsx,
+)
+from bot.states import AddCategory, AddProduct, Broadcast
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -567,3 +575,120 @@ async def cb_order_no(call: CallbackQuery, bot: Bot) -> None:
         call, bot, OrderStatus.CANCELLED,
         "❌ Ваш заказ #{order_id} отменён. По вопросам напишите нам.",
     )
+
+
+# ---------------------------- Рассылка --------------------------------------
+
+
+@router.callback_query(F.data == "adm:broadcast")
+async def cb_broadcast_start(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await state.set_state(Broadcast.collecting)
+    await state.update_data(bc_text="", bc_photos=[])
+    await call.message.edit_text(
+        "📢 <b>Рассылка всем подписчикам</b>\n\n"
+        "Пришлите <b>текст</b> и/или <b>фото</b> (можно несколько).\n"
+        "Когда всё готово — нажмите «Готово, к отправке».",
+        reply_markup=kb.broadcast_collecting(),
+    )
+    await call.answer()
+
+
+@router.message(Broadcast.collecting, F.photo)
+async def bc_photo(message: Message, state: FSMContext) -> None:
+    lock = _photo_locks[message.from_user.id]
+    async with lock:
+        data = await state.get_data()
+        photos: list[dict] = data.get("bc_photos", [])
+        photos.append({"message_id": message.message_id, "file_id": message.photo[-1].file_id})
+        upd = {"bc_photos": photos}
+        if message.caption and not data.get("bc_text"):
+            upd["bc_text"] = message.caption
+        await state.update_data(**upd)
+        count = len(photos)
+    await message.answer(f"📷 Фото добавлено ({count}).", reply_markup=kb.broadcast_collecting())
+
+
+@router.message(Broadcast.collecting, F.text)
+async def bc_text(message: Message, state: FSMContext) -> None:
+    await state.update_data(bc_text=message.text)
+    await message.answer("📝 Текст сохранён.", reply_markup=kb.broadcast_collecting())
+
+
+def _broadcast_payload(data: dict) -> tuple[str, list[str]]:
+    text = data.get("bc_text", "") or ""
+    photos = [
+        p["file_id"]
+        for p in sorted(data.get("bc_photos", []), key=lambda p: p["message_id"])
+    ]
+    return text, photos
+
+
+@router.callback_query(Broadcast.collecting, F.data == "adm:bc_preview")
+async def cb_bc_preview(call: CallbackQuery, state: FSMContext, bot: Bot) -> None:
+    data = await state.get_data()
+    text, photos = _broadcast_payload(data)
+    if not text and not photos:
+        await call.answer("Сначала добавьте текст или фото", show_alert=True)
+        return
+    await state.set_state(Broadcast.confirm)
+
+    from bot.broadcast import _send_to_user
+
+    await call.message.answer("👇 <b>Предпросмотр рассылки:</b>")
+    await _send_to_user(bot, call.from_user.id, text, photos)
+
+    async with async_session() as session:
+        count = (await session.execute(
+            select(func.count(User.telegram_id)).where(User.is_active.is_(True))
+        )).scalar_one()
+    await call.message.answer(
+        f"Отправить рассылку <b>{count}</b> активным подписчикам?",
+        reply_markup=kb.broadcast_confirm(),
+    )
+    await call.answer()
+
+
+@router.callback_query(Broadcast.confirm, F.data == "adm:bc_send")
+async def cb_bc_send(call: CallbackQuery, state: FSMContext, bot: Bot) -> None:
+    data = await state.get_data()
+    text, photos = _broadcast_payload(data)
+    await state.clear()
+    await call.message.edit_text("📤 Отправляю рассылку, это может занять время…")
+    await call.answer()
+    sent, failed = await broadcast(bot, text, photos)
+    await call.message.answer(
+        f"✅ <b>Рассылка завершена</b>\nДоставлено: <b>{sent}</b>\nНе доставлено: <b>{failed}</b>",
+        reply_markup=kb.back_to_menu(),
+    )
+
+
+# ---------------------------- Статистика ------------------------------------
+
+
+@router.callback_query(F.data == "adm:stats")
+async def cb_stats(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    async with async_session() as session:
+        stats = await collect_stats(session)
+    await call.message.edit_text(format_stats(stats), reply_markup=kb.stats_actions())
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("adm:export:"))
+async def cb_export(call: CallbackQuery) -> None:
+    scope = call.data.split(":")[2]
+    await call.answer("Готовлю файл…")
+    async with async_session() as session:
+        if scope == "today":
+            start, end = local_day_bounds_utc(0)
+            users = await fetch_users(session, start, end)
+            fname = "new_subscribers_today.xlsx"
+        else:
+            users = await fetch_users(session)
+            fname = "subscribers.xlsx"
+    if not users:
+        await call.message.answer("Нет данных для выгрузки.")
+        return
+    document = BufferedInputFile(users_to_xlsx(users), filename=fname)
+    await call.message.answer_document(document, caption=f"Записей: {len(users)}")

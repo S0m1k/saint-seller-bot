@@ -15,3 +15,8 @@ class AddProduct(StatesGroup):
 
 class AddCategory(StatesGroup):
     name = State()
+
+
+class Broadcast(StatesGroup):
+    collecting = State()  # админ шлёт текст и/или фото
+    confirm = State()     # предпросмотр + подтверждение

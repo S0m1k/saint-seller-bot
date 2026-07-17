@@ -10,6 +10,33 @@ def admin_menu() -> InlineKeyboardMarkup:
     kb.button(text="📦 Товары", callback_data="adm:products:0")
     kb.button(text="🗂 Категории", callback_data="adm:categories")
     kb.button(text="🧾 Заказы", callback_data="adm:orders")
+    kb.button(text="📢 Рассылка", callback_data="adm:broadcast")
+    kb.button(text="📊 Статистика", callback_data="adm:stats")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def broadcast_collecting() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="✅ Готово, к отправке", callback_data="adm:bc_preview")
+    kb.button(text="✖️ Отмена", callback_data="adm:cancel")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def broadcast_confirm() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="📤 Отправить всем", callback_data="adm:bc_send")
+    kb.button(text="✖️ Отмена", callback_data="adm:cancel")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def stats_actions() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="📥 Все подписчики (Excel)", callback_data="adm:export:all")
+    kb.button(text="📥 Новые за сегодня (Excel)", callback_data="adm:export:today")
+    kb.button(text="⬅️ В меню", callback_data="adm:menu")
     kb.adjust(1)
     return kb.as_markup()
 

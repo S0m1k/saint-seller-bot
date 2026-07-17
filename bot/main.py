@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from aiogram import Dispatcher
@@ -6,6 +7,7 @@ from aiogram.types import BotCommand, MenuButtonWebApp, WebAppInfo
 from core.config import settings
 from bot.handlers import get_router
 from bot.instance import get_bot
+from bot.scheduler import daily_stats_loop
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,10 @@ async def run_bot() -> None:
         await bot.delete_webhook(drop_pending_updates=True)
     except Exception as e:  # noqa: BLE001
         logger.warning("delete_webhook не выполнен: %s", e)
+
+    # фоновый планировщик дневной статистики
+    asyncio.create_task(daily_stats_loop(bot))
+
     logger.info("Бот запущен, начинаю polling...")
     # start_polling сам переживает сетевые обрывы и повторяет запросы
     await dp.start_polling(bot)
