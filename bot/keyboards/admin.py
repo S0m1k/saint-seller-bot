@@ -78,6 +78,22 @@ def photos_done() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def confirm_delete_category(category_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🗑 Да, удалить", callback_data=f"adm:delcat_yes:{category_id}")
+    kb.button(text="⬅️ Отмена", callback_data="adm:categories")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def confirm_delete_product(product_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🗑 Да, удалить", callback_data=f"adm:delprod_yes:{product_id}")
+    kb.button(text="⬅️ Отмена", callback_data=f"adm:product:{product_id}")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 def categories_manage(categories: list[Category]) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     for cat in categories:

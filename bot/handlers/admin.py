@@ -383,6 +383,26 @@ async def cb_delcat(call: CallbackQuery) -> None:
     category_id = int(call.data.split(":")[2])
     async with async_session() as session:
         category = await session.get(Category, category_id)
+        if not category:
+            await call.answer("Категория не найдена", show_alert=True)
+            return
+        count = (await session.execute(
+            select(func.count(Product.id)).where(Product.category_id == category_id)
+        )).scalar_one()
+    await call.message.edit_text(
+        f"⚠️ Удалить категорию <b>«{category.name}»</b>?\n\n"
+        f"Товаров в ней: <b>{count}</b>. Сами товары не удалятся, "
+        f"но останутся без категории.",
+        reply_markup=kb.confirm_delete_category(category_id),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("adm:delcat_yes:"))
+async def cb_delcat_yes(call: CallbackQuery) -> None:
+    category_id = int(call.data.split(":")[2])
+    async with async_session() as session:
+        category = await session.get(Category, category_id)
         if category:
             await session.delete(category)
             await session.commit()
@@ -456,6 +476,22 @@ async def cb_toggle(call: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("adm:delprod:"))
 async def cb_delprod(call: CallbackQuery) -> None:
+    product_id = int(call.data.split(":")[2])
+    async with async_session() as session:
+        product = await session.get(Product, product_id)
+    if not product:
+        await call.answer("Товар не найден", show_alert=True)
+        return
+    await call.message.edit_text(
+        f"⚠️ Удалить товар <b>«{product.name}»</b>?\n\n"
+        f"Действие необратимо: фото и данные будут удалены из каталога.",
+        reply_markup=kb.confirm_delete_product(product_id),
+    )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("adm:delprod_yes:"))
+async def cb_delprod_yes(call: CallbackQuery) -> None:
     product_id = int(call.data.split(":")[2])
     async with async_session() as session:
         product = await session.get(Product, product_id)

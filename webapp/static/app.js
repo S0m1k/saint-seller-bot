@@ -184,6 +184,22 @@
     });
   }
 
+  async function fetchAllProducts(baseParams) {
+    // Каталог показываем целиком: тянем страницы, пока сервер не отдаст
+    // неполную (лимит API — 100 за запрос).
+    const PAGE_SIZE = 100;
+    const all = [];
+    for (let page = 0; page < 30; page++) {
+      const params = new URLSearchParams(baseParams);
+      params.set("page", page);
+      params.set("page_size", PAGE_SIZE);
+      const chunk = await api(`/api/products?${params.toString()}`);
+      all.push(...chunk);
+      if (chunk.length < PAGE_SIZE) break;
+    }
+    return all;
+  }
+
   async function loadCatalog() {
     el.view.innerHTML = `<div class="grid">${'<div class="skeleton"></div>'.repeat(6)}</div>`;
     const params = new URLSearchParams();
@@ -191,7 +207,7 @@
     if (state.brand) params.set("brand", state.brand);
     if (state.search) params.set("search", state.search);
     try {
-      const products = await api(`/api/products?${params.toString()}`);
+      const products = await fetchAllProducts(params);
       if (!products.length) {
         el.view.innerHTML = emptyHTML("search", "Ничего не найдено", "Попробуйте изменить фильтры или загляните позже.");
         return;
@@ -515,6 +531,18 @@
   };
 
   // -------------------------------- Boot ----------------------------------
+  const SPLASH_MIN_MS = 800;
+  const splashShownAt = Date.now();
+  function hideSplash() {
+    const splash = document.getElementById("splash");
+    if (!splash) return;
+    const wait = Math.max(0, SPLASH_MIN_MS - (Date.now() - splashShownAt));
+    setTimeout(() => {
+      splash.classList.add("hide");
+      setTimeout(() => splash.remove(), 500);
+    }, wait);
+  }
+
   hydrateIcons();
   (async function boot() {
     try {
@@ -524,5 +552,6 @@
       await loadCatalog();
       refreshCartCount();
     } catch (e) { /* авторизация уже показана */ }
+    finally { hideSplash(); }
   })();
 })();
